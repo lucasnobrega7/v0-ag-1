@@ -13,6 +13,8 @@ export const clerkConfig = {
   // URLs principais
   dashboardUrl: process.env.NEXT_PUBLIC_DASHBOARD_URL || "https://dash.agentesdeconversao.com.br",
   loginUrl: process.env.NEXT_PUBLIC_LOGIN_URL || "https://login.agentesdeconversao.com.br",
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || "https://api.agentesdeconversao.com.br",
+  docsUrl: process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.agentesdeconversao.com.br",
 
   // Rotas de autenticação
   signInUrl: "/sign-in",

@@ -1,64 +1,52 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { LoginButton } from "@/domains/auth/components/LoginButton"
-import { RegisterButton } from "@/domains/auth/components/RegisterButton"
+import { getDomainUrl } from "@/lib/navigation"
 
-export default function Page() {
+export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
+      <header className="sticky top-0 z-40 w-full border-b bg-background">
+        <div className="container flex h-16 items-center justify-between py-4">
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center">
-              <span className="text-xl font-bold bg-gradient-to-r from-[#46B2E0] via-[#8A53D2] to-[#E056A0] text-transparent bg-clip-text">
-                AgentSaaS
-              </span>
-            </Link>
+            <h1 className="text-xl font-bold">Agentes de Conversão</h1>
           </div>
           <nav className="flex items-center gap-4">
-            <Link href="/docs" className="text-sm font-medium hover:underline">
-              Documentação
+            <Link href="/about">
+              <Button variant="ghost">Sobre</Button>
             </Link>
-            <Link href="/pricing" className="text-sm font-medium hover:underline">
-              Preços
+            <Link href="/pricing">
+              <Button variant="ghost">Preços</Button>
             </Link>
-            <LoginButton mode="redirect" className="ml-4">
-              Entrar
-            </LoginButton>
+            <Link href="/docs">
+              <Button variant="ghost">Documentação</Button>
+            </Link>
+            <Link href={getDomainUrl("login", "/sign-in")}>
+              <Button variant="outline">Entrar</Button>
+            </Link>
+            <Link href={getDomainUrl("login", "/sign-up")}>
+              <Button>Registrar</Button>
+            </Link>
           </nav>
         </div>
       </header>
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-6 lg:grid-cols-2 lg:gap-12 xl:grid-cols-2">
-              <div className="flex flex-col justify-center space-y-4">
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none">
-                    Crie agentes inteligentes com IA
-                  </h1>
-                  <p className="max-w-[600px] text-gray-500 md:text-xl dark:text-gray-400">
-                    Plataforma completa para criar, gerenciar e implantar agentes de IA que interagem com seus usuários
-                    de forma natural e eficiente.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <RegisterButton className="bg-gradient-to-r from-[#46B2E0] via-[#8A53D2] to-[#E056A0] text-white">
-                    Começar Gratuitamente
-                  </RegisterButton>
-                  <Button variant="outline">Agendar Demonstração</Button>
-                </div>
-              </div>
-              <div className="flex items-center justify-center">
-                <img
-                  src="/placeholder-bedip.png"
-                  alt="Dashboard Preview"
-                  className="rounded-lg object-cover"
-                  width={550}
-                  height={550}
-                />
-              </div>
-            </div>
+        <section className="container flex flex-col items-center justify-center gap-6 py-24 text-center md:py-32">
+          <h1 className="text-3xl font-bold sm:text-4xl md:text-5xl lg:text-6xl">
+            Crie agentes de conversação inteligentes
+          </h1>
+          <p className="max-w-[42rem] text-muted-foreground sm:text-xl">
+            Automatize atendimentos, aumente conversões e melhore a experiência dos seus clientes com agentes de IA
+            personalizados.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link href={getDomainUrl("login", "/sign-up")}>
+              <Button size="lg">Começar agora</Button>
+            </Link>
+            <Link href="/docs">
+              <Button variant="outline" size="lg">
+                Documentação
+              </Button>
+            </Link>
           </div>
         </section>
         <section className="w-full py-12 md:py-24 lg:py-32 bg-gray-100 dark:bg-gray-800">
@@ -111,7 +99,7 @@ export default function Page() {
                     strokeLinejoin="round"
                     className="h-6 w-6"
                   >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
                     <path d="M12 18v-6"></path>
                     <path d="M8 18v-1"></path>
@@ -220,18 +208,15 @@ export default function Page() {
           </div>
         </section>
       </main>
-      <footer className="w-full border-t py-6">
-        <div className="container flex flex-col items-center justify-center gap-4 md:flex-row md:gap-8">
-          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            © 2023 AgentSaaS. Todos os direitos reservados.
+      <footer className="border-t py-6 md:py-0">
+        <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+          <p className="text-sm text-muted-foreground">
+            &copy; {new Date().getFullYear()} Agentes de Conversão. Todos os direitos reservados.
           </p>
-          <div className="flex gap-4">
-            <Link href="/terms" className="text-sm text-gray-500 hover:underline dark:text-gray-400">
-              Termos
-            </Link>
-            <Link href="/privacy" className="text-sm text-gray-500 hover:underline dark:text-gray-400">
-              Privacidade
-            </Link>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link href="/terms">Termos</Link>
+            <Link href="/privacy">Privacidade</Link>
+            <Link href="/contact">Contato</Link>
           </div>
         </div>
       </footer>
