@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
+  // Removido swcMinify pois não é mais suportado no Next.js 15.x
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -16,7 +16,35 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: process.env.NEXT_PUBLIC_API_BASE_URL + "/:path*",
+        // Adicionado https:// ao início do destination
+        destination: "https://api.agentesdeconversao.com.br/:path*",
+      },
+    ]
+  },
+  // Configuração para múltiplos domínios
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Access-Control-Allow-Origin",
+            value: "*.agentesdeconversao.com.br",
+          },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET,OPTIONS,PATCH,DELETE,POST,PUT",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value:
+              "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization",
+          },
+          {
+            key: "Access-Control-Allow-Credentials",
+            value: "true",
+          },
+        ],
       },
     ]
   },

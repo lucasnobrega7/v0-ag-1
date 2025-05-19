@@ -1,93 +1,92 @@
-import { apiConfig } from "./api-config"
+import { getApiUrl } from "./navigation"
 
 /**
- * Cliente HTTP para fazer requisições à API
+ * Cliente para fazer requisições à API
  */
-class ApiClient {
+export const apiClient = {
   /**
-   * Faz uma requisição GET
+   * Faz uma requisição GET à API
    */
-  async get(url: string, options: RequestInit = {}) {
-    return this.request(url, { ...options, method: "GET" })
-  }
-
-  /**
-   * Faz uma requisição POST
-   */
-  async post(url: string, data?: any, options: RequestInit = {}) {
-    return this.request(url, {
+  async get<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = getApiUrl(endpoint)
+    const response = await fetch(url, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
       ...options,
-      method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
     })
-  }
 
-  /**
-   * Faz uma requisição PUT
-   */
-  async put(url: string, data?: any, options: RequestInit = {}) {
-    return this.request(url, {
-      ...options,
-      method: "PUT",
-      body: data ? JSON.stringify(data) : undefined,
-    })
-  }
-
-  /**
-   * Faz uma requisição DELETE
-   */
-  async delete(url: string, options: RequestInit = {}) {
-    return this.request(url, { ...options, method: "DELETE" })
-  }
-
-  /**
-   * Faz uma requisição HTTP genérica
-   */
-  private async request(url: string, options: RequestInit) {
-    const { headers, ...restOptions } = options
-
-    // Construir a URL completa
-    const fullUrl = url.startsWith("http") ? url : `${apiConfig.baseUrl}${url}`
-
-    // Configurar o timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), apiConfig.timeout)
-
-    try {
-      const response = await fetch(fullUrl, {
-        ...restOptions,
-        headers: {
-          ...apiConfig.headers,
-          ...headers,
-        },
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeoutId)
-
-      // Verificar se a resposta foi bem-sucedida
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `Request failed with status ${response.status}`)
-      }
-
-      // Verificar se a resposta é JSON
-      const contentType = response.headers.get("content-type")
-      if (contentType && contentType.includes("application/json")) {
-        return await response.json()
-      }
-
-      return await response.text()
-    } catch (error) {
-      clearTimeout(timeoutId)
-
-      if (error.name === "AbortError") {
-        throw new Error("Request timeout")
-      }
-
-      throw error
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
     }
-  }
-}
 
-export const apiClient = new ApiClient()
+    return response.json()
+  },
+
+  /**
+   * Faz uma requisição POST à API
+   */
+  async post<T>(endpoint: string, data: any, options: RequestInit = {}): Promise<T> {
+    const url = getApiUrl(endpoint)
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+      ...options,
+    })
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    return response.json()
+  },
+
+  /**
+   * Faz uma requisição PUT à API
+   */
+  async put<T>(endpoint: string, data: any, options: RequestInit = {}): Promise<T> {
+    const url = getApiUrl(endpoint)
+    const response = await fetch(url, {
+      method: "PUT",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+      ...options,
+    })
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    return response.json()
+  },
+
+  /**
+   * Faz uma requisição DELETE à API
+   */
+  async delete<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = getApiUrl(endpoint)
+    const response = await fetch(url, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      ...options,
+    })
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`)
+    }
+
+    return response.json()
+  },
+}

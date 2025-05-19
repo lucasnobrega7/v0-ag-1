@@ -1,8 +1,10 @@
 import type React from "react"
-// Adicione o import do ClerkProvider
-import { ClerkProvider } from "@clerk/nextjs"
+import { MultiDomainClerkProvider } from "@/lib/auth/clerk-multi-domain"
+import { ThemeProvider } from "@/components/providers/theme-provider"
+import { AnalyticsProvider } from "@/components/providers/analytics-provider"
+import { Suspense } from "react"
+import "./globals.css"
 
-// No componente RootLayout, envolva o children com ClerkProvider
 export default function RootLayout({
   children,
 }: {
@@ -11,7 +13,13 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
-        <ClerkProvider>{children}</ClerkProvider>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MultiDomainClerkProvider>
+            <ThemeProvider>
+              <AnalyticsProvider>{children}</AnalyticsProvider>
+            </ThemeProvider>
+          </MultiDomainClerkProvider>
+        </Suspense>
       </body>
     </html>
   )

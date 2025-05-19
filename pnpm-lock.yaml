@@ -138,11 +138,11 @@ importers:
         specifier: 15.2.4
         version: 15.2.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       next-themes:
-        specifier: ^0.4.4
-        version: 0.4.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        specifier: latest
+        version: 0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       posthog-js:
         specifier: latest
-        version: 1.244.0(@rrweb/types@2.0.0-alpha.18)(rrweb-snapshot@2.0.0-alpha.4)
+        version: 1.245.0(@rrweb/types@2.0.0-alpha.18)(rrweb-snapshot@2.0.0-alpha.4)
       react:
         specifier: ^19
         version: 19.0.0
@@ -2085,8 +2085,8 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  next-themes@0.4.4:
-    resolution: {integrity: sha512-LDQ2qIOJF0VnuVrrMSMLrWGjRMkq+0mpgl6e0juCLqdJ+oo8Q84JRWT6Wh11VDQKkMMe+dVzDKLWs5n87T+PkQ==}
+  next-themes@0.4.6:
+    resolution: {integrity: sha512-pZvgD5L0IEvX5/9GWyHMf3m8BKiVQwsCMHfoFosXtXBMnaS0ZnIJ9ST4b4NqLVKDEm8QBxoNNGNaBv2JNF6XNA==}
     peerDependencies:
       react: ^16.8 || ^17 || ^18 || ^19 || ^19.0.0-rc
       react-dom: ^16.8 || ^17 || ^18 || ^19 || ^19.0.0-rc
@@ -2221,8 +2221,8 @@ packages:
     resolution: {integrity: sha512-dle9A3yYxlBSrt8Fu+IpjGT8SY8hN0mlaA6GY8t0P5PjIOZemULz/E2Bnm/2dcUOena75OTNkHI76uZBNUUq3A==}
     engines: {node: ^10 || ^12 || >=14}
 
-  posthog-js@1.244.0:
-    resolution: {integrity: sha512-kmQMuHvERFZruCktwrQAQLAnfHpKuCaUDJGVp4j3UAKXeCbv62PiGGwK793UpXzCDKjVyZWhdXknLmFnvD3cXg==}
+  posthog-js@1.245.0:
+    resolution: {integrity: sha512-vrEyQ2ARC07kmgrcJY+2/ij6PfSiBb9IGnmaWxxikYrkHL4LEGNkJ637R1EvNDE6+IflQMixo/3Kd2IjXFYx+A==}
     peerDependencies:
       '@rrweb/types': 2.0.0-alpha.17
       rrweb-snapshot: 2.0.0-alpha.17
@@ -4560,7 +4560,7 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  next-themes@0.4.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
+  next-themes@0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0):
     dependencies:
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
@@ -4678,7 +4678,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  posthog-js@1.244.0(@rrweb/types@2.0.0-alpha.18)(rrweb-snapshot@2.0.0-alpha.4):
+  posthog-js@1.245.0(@rrweb/types@2.0.0-alpha.18)(rrweb-snapshot@2.0.0-alpha.4):
     dependencies:
       core-js: 3.42.0
       fflate: 0.4.8
