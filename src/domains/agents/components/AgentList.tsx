@@ -9,9 +9,6 @@ import { Input } from "@/components/ui/input"
 import type { Agent } from "../types/agent.types"
 import { agentService } from "../services/agentService"
 
-/**
- * Componente para listar agentes com funcionalidades de busca e filtragem
- */
 export function AgentList() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [searchQuery, setSearchQuery] = useState("")

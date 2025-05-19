@@ -15,9 +15,6 @@ import {
 import { Bell, HelpCircle, Settings, User, LogOut } from "lucide-react"
 import { useAuth } from "@/domains/auth/hooks/useAuth"
 
-/**
- * Header do dashboard com perfil do usuário e notificações
- */
 export function DashboardHeader() {
   const { user, isLoading } = useCurrentUser()
   const { logout } = useAuth()

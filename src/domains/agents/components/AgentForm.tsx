@@ -1,245 +1,173 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { Agent, AgentModelName, AgentVisibility } from "../types/agent.types"
+import { Switch } from "@/components/ui/switch"
 import { agentService } from "../services/agentService"
-import { useToast } from "@/hooks/use-toast"
-
-const agentFormSchema = z.object({
-  name: z.string().min(1, "Nome é obrigatório"),
-  description: z.string().min(1, "Descrição é obrigatória"),
-  instructions: z.string().min(1, "Instruções são obrigatórias"),
-  modelName: z.enum(["gpt-3.5-turbo", "gpt-4", "gpt-4o", "claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]),
-  temperature: z.number().min(0).max(1),
-  visibility: z.enum(["public", "private", "organization"]),
-  handle: z.string().optional(),
-  includeSources: z.boolean().default(true),
-})
-
-type AgentFormValues = z.infer<typeof agentFormSchema>
+import type { CreateAgentParams } from "../types/agent.types"
 
 interface AgentFormProps {
-  agent?: Agent
   organizationId: string
-  onSuccess?: (agent: Agent) => void
+  onSuccess?: () => void
 }
 
-/**
- * Formulário para criação e edição de agentes
- */
-export function AgentForm({ agent, organizationId, onSuccess }: AgentFormProps) {
+export function AgentForm({ organizationId, onSuccess }: AgentFormProps) {
+  const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { toast } = useToast()
-
-  const form = useForm<AgentFormValues>({
-    resolver: zodResolver(agentFormSchema),
-    defaultValues: agent
-      ? {
-          name: agent.name,
-          description: agent.description,
-          instructions: agent.instructions,
-          modelName: agent.modelName,
-          temperature: agent.temperature,
-          visibility: agent.visibility,
-          handle: agent.handle,
-          includeSources: agent.includeSources ?? true,
-        }
-      : {
-          name: "",
-          description: "",
-          instructions: "Você é um assistente de IA útil.",
-          modelName: "gpt-4o",
-          temperature: 0.7,
-          visibility: "private",
-          includeSources: true,
-        },
+  const [formData, setFormData] = useState<CreateAgentParams>({
+    name: "",
+    description: "",
+    instructions: "",
+    modelName: "gpt-4",
+    visibility: "private",
+    iconUrl: "",
+    isPublished: false,
+    organizationId,
   })
 
-  const handleSubmit = async (values: AgentFormValues) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setFormData((prev) => ({ ...prev, [name]: checked }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setIsSubmitting(true)
+
     try {
-      let result: Agent
-
-      if (agent) {
-        // Atualizar agente existente
-        result = await agentService.updateAgent({
-          id: agent.id,
-          ...values,
-        })
-        toast({
-          title: "Agente atualizado",
-          description: "Seu agente foi atualizado com sucesso.",
-        })
-      } else {
-        // Criar novo agente
-        result = await agentService.createAgent(organizationId, values)
-        toast({
-          title: "Agente criado",
-          description: "Seu novo agente foi criado com sucesso.",
-        })
-      }
-
+      await agentService.createAgent(formData)
       if (onSuccess) {
-        onSuccess(result)
+        onSuccess()
+      } else {
+        router.push("/agents")
       }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Falha ao salvar agente",
-        variant: "destructive",
-      })
+      console.error("Error creating agent:", error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{agent ? "Editar Agente" : "Criar Novo Agente"}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit}>
+      <Card>
+        <CardHeader>
+          <CardTitle>Criar Novo Agente</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="name" className="text-sm font-medium">
-              Nome
-            </label>
-            <Input id="name" {...form.register("name")} placeholder="Meu Assistente IA" />
-            {form.formState.errors.name && <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>}
+            <Label htmlFor="name">Nome</Label>
+            <Input
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="Nome do agente"
+              required
+            />
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="description" className="text-sm font-medium">
-              Descrição
-            </label>
+            <Label htmlFor="description">Descrição</Label>
             <Textarea
               id="description"
-              {...form.register("description")}
-              placeholder="Um assistente de IA útil que pode responder perguntas sobre seu negócio."
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Descreva o propósito deste agente"
+              rows={3}
             />
-            {form.formState.errors.description && (
-              <p className="text-sm text-red-500">{form.formState.errors.description.message}</p>
-            )}
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="instructions" className="text-sm font-medium">
-              Instruções
-            </label>
+            <Label htmlFor="instructions">Instruções</Label>
             <Textarea
               id="instructions"
-              {...form.register("instructions")}
-              placeholder="Você é um assistente de IA útil..."
+              name="instructions"
+              value={formData.instructions}
+              onChange={handleChange}
+              placeholder="Instruções detalhadas para o comportamento do agente"
               rows={5}
+              required
             />
-            {form.formState.errors.instructions && (
-              <p className="text-sm text-red-500">{form.formState.errors.instructions.message}</p>
-            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="modelName" className="text-sm font-medium">
-                Modelo
-              </label>
-              <Select
-                onValueChange={(value) => form.setValue("modelName", value as AgentModelName)}
-                defaultValue={form.getValues("modelName")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um modelo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                  <SelectItem value="gpt-4">GPT-4</SelectItem>
-                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                  <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
-                  <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
-                  <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
-                </SelectContent>
-              </Select>
-              {form.formState.errors.modelName && (
-                <p className="text-sm text-red-500">{form.formState.errors.modelName.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="temperature" className="text-sm font-medium">
-                Temperatura
-              </label>
-              <Input
-                id="temperature"
-                type="number"
-                step="0.1"
-                min="0"
-                max="1"
-                {...form.register("temperature", { valueAsNumber: true })}
-              />
-              {form.formState.errors.temperature && (
-                <p className="text-sm text-red-500">{form.formState.errors.temperature.message}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="modelName">Modelo</Label>
+            <Select value={formData.modelName} onValueChange={(value) => handleSelectChange("modelName", value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um modelo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gpt-4">GPT-4</SelectItem>
+                <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                <SelectItem value="claude-2">Claude 2</SelectItem>
+                <SelectItem value="llama-2">Llama 2</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="visibility" className="text-sm font-medium">
-                Visibilidade
-              </label>
-              <Select
-                onValueChange={(value) => form.setValue("visibility", value as AgentVisibility)}
-                defaultValue={form.getValues("visibility")}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a visibilidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="private">Privado</SelectItem>
-                  <SelectItem value="organization">Organização</SelectItem>
-                  <SelectItem value="public">Público</SelectItem>
-                </SelectContent>
-              </Select>
-              {form.formState.errors.visibility && (
-                <p className="text-sm text-red-500">{form.formState.errors.visibility.message}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="visibility">Visibilidade</Label>
+            <Select
+              value={formData.visibility}
+              onValueChange={(value) => handleSelectChange("visibility", value as "public" | "private")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a visibilidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">Privado</SelectItem>
+                <SelectItem value="public">Público</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="handle" className="text-sm font-medium">
-                Handle (opcional)
-              </label>
-              <Input id="handle" {...form.register("handle")} placeholder="meu-assistente" />
-              {form.formState.errors.handle && (
-                <p className="text-sm text-red-500">{form.formState.errors.handle.message}</p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="iconUrl">URL do Ícone</Label>
+            <Input
+              id="iconUrl"
+              name="iconUrl"
+              value={formData.iconUrl}
+              onChange={handleChange}
+              placeholder="https://exemplo.com/icone.png"
+            />
           </div>
 
           <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="includeSources"
-              {...form.register("includeSources")}
-              className="h-4 w-4 rounded border-gray-300"
+            <Switch
+              id="isPublished"
+              checked={formData.isPublished}
+              onCheckedChange={(checked) => handleSwitchChange("isPublished", checked)}
             />
-            <label htmlFor="includeSources" className="text-sm font-medium">
-              Incluir fontes nas respostas
-            </label>
+            <Label htmlFor="isPublished">Publicar agente</Label>
           </div>
-
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Salvando..." : agent ? "Atualizar Agente" : "Criar Agente"}
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          <Button type="button" variant="outline" onClick={() => router.back()}>
+            Cancelar
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Criando..." : "Criar Agente"}
+          </Button>
+        </CardFooter>
+      </Card>
+    </form>
   )
 }

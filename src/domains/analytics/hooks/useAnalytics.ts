@@ -9,9 +9,6 @@ interface UseAnalyticsProps {
   filter?: AnalyticsFilter
 }
 
-/**
- * Hook para gerenciar dados de análise
- */
 export function useAnalytics({ organizationId, filter }: UseAnalyticsProps) {
   const [dashboardMetrics, setDashboardMetrics] = useState<Metric[]>([])
   const [conversationsChartData, setConversationsChartData] = useState<ChartData | null>(null)

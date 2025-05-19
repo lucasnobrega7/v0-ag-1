@@ -6,9 +6,6 @@ import type {
   IntegrationStatus,
 } from "../types/integration.types"
 
-/**
- * Serviço para gerenciar integrações
- */
 export const integrationService = {
   /**
    * Obtém todas as integrações de uma organização

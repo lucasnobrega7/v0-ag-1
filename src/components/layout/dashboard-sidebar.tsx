@@ -7,9 +7,6 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/domains/auth/hooks/useAuth"
 import { Home, MessageSquare, Database, FileText, Settings, Users, BarChart2, LogOut, Search, Plug } from "lucide-react"
 
-/**
- * Sidebar do dashboard com navegação principal
- */
 export function DashboardSidebar() {
   const pathname = usePathname()
   const { logout, isLoggingOut } = useAuth()

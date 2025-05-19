@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,16 +10,17 @@ interface RegisterButtonProps {
   redirectUrl?: string
   mode?: "redirect" | "modal"
   className?: string
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  size?: "default" | "sm" | "lg" | "icon"
   children?: React.ReactNode
 }
 
-/**
- * Botão para iniciar o processo de registro
- */
 export function RegisterButton({
   redirectUrl = "/dashboard",
   mode = "redirect",
   className,
+  variant = "default",
+  size = "default",
   children,
 }: RegisterButtonProps) {
   const router = useRouter()
@@ -51,8 +51,14 @@ export function RegisterButton({
   }
 
   return (
-    <Button onClick={handleRegister} disabled={isLoading || !isLoaded} className={className}>
-      {isLoading ? "Carregando..." : children || "Registrar"}
+    <Button
+      onClick={handleRegister}
+      disabled={isLoading || !isLoaded}
+      className={className}
+      variant={variant}
+      size={size}
+    >
+      {isLoading ? "Carregando..." : children || "Criar conta"}
     </Button>
   )
 }

@@ -12,9 +12,6 @@ interface IntegrationCardProps {
   onDelete?: (integration: Integration) => void
 }
 
-/**
- * Componente para exibir uma integração em formato de card
- */
 export function IntegrationCard({ integration, onEdit, onDelete }: IntegrationCardProps) {
   // Função para renderizar o ícone correto com base no tipo de integração
   const renderIcon = () => {

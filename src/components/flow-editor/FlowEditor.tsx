@@ -1,22 +1,25 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import ReactFlow, { Background, Controls, MiniMap, Panel, addEdge, type Connection } from "reactflow"
+import { useState, useCallback, useRef, useEffect } from "react"
+import ReactFlow, { Background, Controls, MiniMap, Panel, type Connection, type NodeTypes } from "reactflow"
 import "reactflow/dist/style.css"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Save, Undo, Redo, Play, Plus } from "lucide-react"
 import { useFlow } from "@/contexts/FlowContext"
 import { IntentNode } from "./nodes/IntentNode"
 import { MessageNode } from "./nodes/MessageNode"
 import { ActionNode } from "./nodes/ActionNode"
 import { ConditionNode } from "./nodes/ConditionNode"
+import { NodePanel } from "./NodePanel"
 import { NodeEditor } from "./NodeEditor"
-import { Save, Undo, Redo, Play, Plus } from "lucide-react"
+import type { INode, IEdge } from "@/lib/interfaces/flow"
 
-// Definir os tipos de nós personalizados
-const nodeTypes = {
+// Define os tipos de nós disponíveis
+const nodeTypes: NodeTypes = {
   intentNode: IntentNode,
   messageNode: MessageNode,
   actionNode: ActionNode,
@@ -38,6 +41,7 @@ export function FlowEditor({ flowId }: FlowEditorProps) {
     saveFlow,
     updateFlowName,
     updateFlowDescription,
+    validateFlow,
     undo,
     redo,
     canUndo,
@@ -46,39 +50,57 @@ export function FlowEditor({ flowId }: FlowEditorProps) {
     saving,
   } = useFlow()
 
-  const [selectedNode, setSelectedNode] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<string>("editor")
+  const [selectedNode, setSelectedNode] = useState<INode | null>(null)
+  const [reactFlowInstance, setReactFlowInstance] = useState(null)
+  const reactFlowWrapper = useRef<HTMLDivElement>(null)
 
   // Carregar o fluxo quando o componente for montado
-  useState(() => {
+  useEffect(() => {
     loadFlow(flowId)
-  })
+  }, [flowId, loadFlow])
 
   // Manipuladores de eventos do ReactFlow
   const onNodesChange = useCallback(
     (changes) => {
-      setNodes(changes)
+      setNodes(
+        nodes.map((node) => {
+          const change = changes.find((c) => c.id === node.id)
+          if (change && change.type === "position" && change.position) {
+            return { ...node, position: change.position }
+          }
+          return node
+        }),
+      )
     },
-    [setNodes],
+    [nodes, setNodes],
   )
 
   const onEdgesChange = useCallback(
     (changes) => {
-      setEdges(changes)
+      // Implementar lógica para atualizar as arestas com base nas mudanças
+      // Isso é mais complexo e depende do tipo de mudanças que você quer permitir
     },
     [setEdges],
   )
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      setEdges((eds) => addEdge({ ...connection, animated: true }, eds))
+      // Criar uma nova aresta quando os nós são conectados
+      const newEdge: IEdge = {
+        id: `e-${connection.source}-${connection.target}`,
+        source: connection.source || "",
+        target: connection.target || "",
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
+      }
+      setEdges([...edges, newEdge])
     },
-    [setEdges],
+    [edges, setEdges],
   )
 
   const onNodeClick = useCallback(
-    (_, node) => {
-      setSelectedNode(node.id)
+    (event, node) => {
+      setSelectedNode(node)
     },
     [setSelectedNode],
   )
@@ -87,11 +109,11 @@ export function FlowEditor({ flowId }: FlowEditorProps) {
     setSelectedNode(null)
   }, [setSelectedNode])
 
-  // Adicionar um novo nó ao fluxo
+  // Função para adicionar um novo nó
   const addNode = useCallback(
     (type: string) => {
-      const newNode = {
-        id: `${type}_${Date.now()}`,
+      const newNode: INode = {
+        id: `node-${Date.now()}`,
         type: `${type}Node`,
         position: { x: 100, y: 100 },
         data: {
@@ -100,55 +122,110 @@ export function FlowEditor({ flowId }: FlowEditorProps) {
           ...(type === "intent" && { patterns: [] }),
           ...(type === "message" && { content: "" }),
           ...(type === "action" && { actionType: "api", config: {} }),
-          ...(type === "condition" && { condition: "", branches: [{ label: "Sim" }, { label: "Não" }] }),
+          ...(type === "condition" && { condition: "", branches: [] }),
         },
       }
-
       setNodes([...nodes, newNode])
+      setSelectedNode(newNode)
     },
     [nodes, setNodes],
   )
 
-  // Renderizar o editor de fluxo
+  // Função para executar o fluxo (simulação)
+  const runFlow = useCallback(() => {
+    const validationResult = validateFlow()
+    if (!validationResult.valid) {
+      alert(`Fluxo inválido: ${validationResult.errors.join("\n")}`)
+      return
+    }
+    alert("Simulação de fluxo iniciada!")
+    // Implementar lógica de simulação do fluxo
+  }, [validateFlow])
+
   return (
     <div className="h-full flex flex-col">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between border-b p-2">
-          <div className="flex items-center space-x-2">
-            <Input
-              value={flow?.name || ""}
-              onChange={(e) => updateFlowName(e.target.value)}
-              placeholder="Nome do fluxo"
-              className="w-64"
-            />
-            <TabsList>
-              <TabsTrigger value="editor">Editor</TabsTrigger>
-              <TabsTrigger value="simulator">Simulador</TabsTrigger>
-              <TabsTrigger value="code">Código</TabsTrigger>
+      <div className="flex justify-between items-center p-4 border-b">
+        <div className="flex-1">
+          <Input
+            value={flow?.name || ""}
+            onChange={(e) => updateFlowName(e.target.value)}
+            placeholder="Nome do fluxo"
+            className="text-xl font-bold mb-1"
+          />
+          <Input
+            value={flow?.description || ""}
+            onChange={(e) => updateFlowDescription(e.target.value)}
+            placeholder="Descrição do fluxo"
+            className="text-sm text-gray-500"
+          />
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline" onClick={undo} disabled={!canUndo}>
+            <Undo className="h-4 w-4 mr-1" />
+            Desfazer
+          </Button>
+          <Button variant="outline" onClick={redo} disabled={!canRedo}>
+            <Redo className="h-4 w-4 mr-1" />
+            Refazer
+          </Button>
+          <Button variant="outline" onClick={runFlow}>
+            <Play className="h-4 w-4 mr-1" />
+            Testar
+          </Button>
+          <Button onClick={saveFlow} disabled={saving}>
+            <Save className="h-4 w-4 mr-1" />
+            {saving ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex">
+        <div className="w-64 border-r p-4 bg-gray-50">
+          <Tabs defaultValue="nodes">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="nodes" className="flex-1">
+                Nós
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex-1">
+                Configurações
+              </TabsTrigger>
             </TabsList>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo}>
-              <Undo className="h-4 w-4 mr-1" />
-              Desfazer
-            </Button>
-            <Button variant="outline" size="sm" onClick={redo} disabled={!canRedo}>
-              <Redo className="h-4 w-4 mr-1" />
-              Refazer
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setActiveTab("simulator")}>
-              <Play className="h-4 w-4 mr-1" />
-              Testar
-            </Button>
-            <Button size="sm" onClick={saveFlow} disabled={saving}>
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? "Salvando..." : "Salvar"}
-            </Button>
-          </div>
+            <TabsContent value="nodes">
+              <NodePanel onAddNode={addNode} />
+            </TabsContent>
+            <TabsContent value="settings">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Configurações do Fluxo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="flowName">Nome</Label>
+                      <Input id="flowName" value={flow?.name || ""} onChange={(e) => updateFlowName(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="flowDescription">Descrição</Label>
+                      <Input
+                        id="flowDescription"
+                        value={flow?.description || ""}
+                        onChange={(e) => updateFlowDescription(e.target.value)}
+                      />
+                    </div>
+                    {/* Outras configurações do fluxo */}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
-        <TabsContent value="editor" className="flex-1 flex">
-          <div className="flex-1 relative">
+        <div className="flex-1 h-full" ref={reactFlowWrapper}>
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : (
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -163,63 +240,22 @@ export function FlowEditor({ flowId }: FlowEditorProps) {
               <Background />
               <Controls />
               <MiniMap />
-              <Panel position="top-right" className="bg-white rounded-md shadow-md p-2">
-                <div className="flex flex-col space-y-1">
-                  <Button size="sm" variant="outline" onClick={() => addNode("intent")}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Intent
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addNode("message")}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Message
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addNode("action")}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Action
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => addNode("condition")}>
-                    <Plus className="h-3 w-3 mr-1" />
-                    Condition
-                  </Button>
-                </div>
+              <Panel position="top-right">
+                <Button variant="outline" onClick={() => addNode("intent")}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Intent
+                </Button>
               </Panel>
             </ReactFlow>
-          </div>
-
-          {selectedNode && (
-            <div className="w-80 border-l">
-              <NodeEditor nodeId={selectedNode} onClose={() => setSelectedNode(null)} />
-            </div>
           )}
-        </TabsContent>
+        </div>
 
-        <TabsContent value="simulator" className="flex-1">
-          <div className="p-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Simulador de Fluxo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p>O simulador permite testar o fluxo em tempo real.</p>
-                {/* Implementação do simulador */}
-              </CardContent>
-            </Card>
+        {selectedNode && (
+          <div className="w-80 border-l p-4 bg-gray-50">
+            <NodeEditor node={selectedNode} />
           </div>
-        </TabsContent>
-
-        <TabsContent value="code" className="flex-1">
-          <div className="p-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Código do Fluxo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="bg-gray-100 p-4 rounded overflow-auto">{JSON.stringify({ nodes, edges }, null, 2)}</pre>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
     </div>
   )
 }

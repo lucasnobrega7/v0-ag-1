@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,13 +10,19 @@ interface LoginButtonProps {
   redirectUrl?: string
   mode?: "redirect" | "modal"
   className?: string
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  size?: "default" | "sm" | "lg" | "icon"
   children?: React.ReactNode
 }
 
-/**
- * Botão para iniciar o processo de login
- */
-export function LoginButton({ redirectUrl = "/dashboard", mode = "redirect", className, children }: LoginButtonProps) {
+export function LoginButton({
+  redirectUrl = "/dashboard",
+  mode = "redirect",
+  className,
+  variant = "default",
+  size = "default",
+  children,
+}: LoginButtonProps) {
   const router = useRouter()
   const { signIn, isLoaded } = useSignIn()
   const [isLoading, setIsLoading] = useState(false)
@@ -46,7 +51,7 @@ export function LoginButton({ redirectUrl = "/dashboard", mode = "redirect", cla
   }
 
   return (
-    <Button onClick={handleLogin} disabled={isLoading || !isLoaded} className={className}>
+    <Button onClick={handleLogin} disabled={isLoading || !isLoaded} className={className} variant={variant} size={size}>
       {isLoading ? "Carregando..." : children || "Entrar"}
     </Button>
   )

@@ -1,15 +1,6 @@
 import { supabaseClient } from "@/lib/supabase"
-import type {
-  Conversation,
-  Message,
-  CreateConversationParams,
-  SendMessageParams,
-  ConversationWithMessages,
-} from "../types/conversation.types"
+import type { Message, Conversation, SendMessageParams, MessageResponse } from "../types/conversation.types"
 
-/**
- * Serviço para gerenciar conversas e mensagens
- */
 export const conversationService = {
   /**
    * Obtém todas as conversas de um usuário
@@ -31,119 +22,129 @@ export const conversationService = {
   /**
    * Obtém uma conversa pelo ID
    */
-  async getConversationById(id: string): Promise<ConversationWithMessages | null> {
-    // Obter a conversa
-    const { data: conversation, error: conversationError } = await supabaseClient
-      .from("conversations")
-      .select("*")
-      .eq("id", id)
-      .single()
-
-    if (conversationError) {
-      if (conversationError.code === "PGRST116") {
-        return null
-      }
-      throw new Error(`Failed to fetch conversation: ${conversationError.message}`)
-    }
-
-    // Obter as mensagens da conversa
-    const { data: messages, error: messagesError } = await supabaseClient
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", id)
-      .order("created_at", { ascending: true })
-
-    if (messagesError) {
-      throw new Error(`Failed to fetch messages: ${messagesError.message}`)
-    }
-
-    return {
-      ...transformConversationFromDB(conversation),
-      messages: messages.map(transformMessageFromDB),
-    }
-  },
-
-  /**
-   * Cria uma nova conversa
-   */
-  async createConversation(params: CreateConversationParams): Promise<Conversation> {
-    const { data, error } = await supabaseClient
-      .from("conversations")
-      .insert([
-        {
-          user_id: params.userId,
-          agent_id: params.agentId,
-          title: params.title || "Nova conversa",
-        },
-      ])
-      .select()
-      .single()
+  async getConversationById(id: string): Promise<Conversation | null> {
+    const { data, error } = await supabaseClient.from("conversations").select("*").eq("id", id).single()
 
     if (error) {
-      throw new Error(`Failed to create conversation: ${error.message}`)
+      if (error.code === "PGRST116") {
+        return null
+      }
+      throw new Error(`Failed to fetch conversation: ${error.message}`)
     }
 
     return transformConversationFromDB(data)
   },
 
   /**
-   * Envia uma mensagem em uma conversa
+   * Obtém as mensagens de uma conversa
    */
-  async sendMessage(params: SendMessageParams): Promise<Message> {
-    // Inserir a mensagem
-    const { data: message, error: messageError } = await supabaseClient
+  async getMessages(conversationId: string): Promise<Message[]> {
+    const { data, error } = await supabaseClient
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      throw new Error(`Failed to fetch messages: ${error.message}`)
+    }
+
+    return data.map(transformMessageFromDB)
+  },
+
+  /**
+   * Envia uma mensagem para um agente
+   */
+  async sendMessage(params: SendMessageParams): Promise<MessageResponse> {
+    let conversationId = params.conversationId
+
+    // Se não houver ID de conversa, cria uma nova conversa
+    if (!conversationId) {
+      const { data: conversationData, error: conversationError } = await supabaseClient
+        .from("conversations")
+        .insert([
+          {
+            user_id: "current_user_id", // Substituir pelo ID do usuário atual
+            agent_id: params.agentId,
+            title: params.content.substring(0, 50) + (params.content.length > 50 ? "..." : ""),
+          },
+        ])
+        .select()
+        .single()
+
+      if (conversationError) {
+        throw new Error(`Failed to create conversation: ${conversationError.message}`)
+      }
+
+      conversationId = conversationData.id
+    }
+
+    // Insere a mensagem do usuário
+    const { data: userMessageData, error: userMessageError } = await supabaseClient
       .from("messages")
       .insert([
         {
-          conversation_id: params.conversationId,
-          role: params.role,
+          conversation_id: conversationId,
           content: params.content,
-          attachments: params.attachments,
+          role: "user",
         },
       ])
       .select()
       .single()
 
-    if (messageError) {
-      throw new Error(`Failed to send message: ${messageError.message}`)
+    if (userMessageError) {
+      throw new Error(`Failed to send user message: ${userMessageError.message}`)
     }
 
-    // Atualizar a data de atualização da conversa
-    const { error: updateError } = await supabaseClient
-      .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", params.conversationId)
+    // Simula a resposta do agente (em um ambiente real, isso chamaria uma API de IA)
+    const agentResponse = await simulateAgentResponse(params.agentId, params.content)
 
-    if (updateError) {
-      console.error("Failed to update conversation timestamp:", updateError)
+    // Insere a resposta do agente
+    const { data: agentMessageData, error: agentMessageError } = await supabaseClient
+      .from("messages")
+      .insert([
+        {
+          conversation_id: conversationId,
+          content: agentResponse,
+          role: "assistant",
+        },
+      ])
+      .select()
+      .single()
+
+    if (agentMessageError) {
+      throw new Error(`Failed to send agent message: ${agentMessageError.message}`)
     }
 
-    return transformMessageFromDB(message)
+    // Atualiza o título da conversa se for uma nova conversa
+    if (!params.conversationId) {
+      await supabaseClient
+        .from("conversations")
+        .update({ title: params.content.substring(0, 50) + (params.content.length > 50 ? "..." : "") })
+        .eq("id", conversationId)
+    }
+
+    return {
+      id: agentMessageData.id,
+      content: agentMessageData.content,
+      role: agentMessageData.role,
+      conversationId,
+      createdAt: agentMessageData.created_at,
+    }
   },
 
   /**
-   * Atualiza o título de uma conversa
-   */
-  async updateConversationTitle(id: string, title: string): Promise<void> {
-    const { error } = await supabaseClient.from("conversations").update({ title }).eq("id", id)
-
-    if (error) {
-      throw new Error(`Failed to update conversation title: ${error.message}`)
-    }
-  },
-
-  /**
-   * Remove uma conversa
+   * Exclui uma conversa
    */
   async deleteConversation(id: string): Promise<void> {
-    // Primeiro, remover todas as mensagens da conversa
+    // Primeiro exclui todas as mensagens da conversa
     const { error: messagesError } = await supabaseClient.from("messages").delete().eq("conversation_id", id)
 
     if (messagesError) {
       throw new Error(`Failed to delete conversation messages: ${messagesError.message}`)
     }
 
-    // Em seguida, remover a conversa
+    // Depois exclui a conversa
     const { error: conversationError } = await supabaseClient.from("conversations").delete().eq("id", id)
 
     if (conversationError) {
@@ -152,7 +153,17 @@ export const conversationService = {
   },
 }
 
-// Helper function to transform database record to Conversation type
+// Função auxiliar para simular a resposta de um agente
+async function simulateAgentResponse(agentId: string, message: string): Promise<string> {
+  // Em um ambiente real, isso chamaria uma API de IA
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(`Esta é uma resposta simulada para: "${message}". Agente ID: ${agentId}`)
+    }, 1000)
+  })
+}
+
+// Helper functions to transform database records
 function transformConversationFromDB(record: any): Conversation {
   return {
     id: record.id,
@@ -164,14 +175,12 @@ function transformConversationFromDB(record: any): Conversation {
   }
 }
 
-// Helper function to transform database record to Message type
 function transformMessageFromDB(record: any): Message {
   return {
     id: record.id,
     conversationId: record.conversation_id,
-    role: record.role,
     content: record.content,
-    attachments: record.attachments || [],
+    role: record.role,
     createdAt: new Date(record.created_at),
   }
 }
