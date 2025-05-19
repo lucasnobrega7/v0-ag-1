@@ -2,195 +2,207 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
+import { Send, Paperclip, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Paperclip, Mic, Bot, User } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { conversationService } from "../services/conversationService"
+import { cn } from "@/lib/utils"
 import type { Message } from "../types/conversation.types"
-import type { Agent } from "@/domains/agents/types/agent.types"
 
 interface ChatInterfaceProps {
-  agent: Agent
+  agentId: string
+  agentName: string
+  agentIconUrl?: string
+  messages: Message[]
+  onSendMessage: (content: string, attachments?: File[]) => Promise<void>
+  isLoading?: boolean
+  placeholder?: string
 }
 
-/**
- * Interface de chat para interagir com um agente
- */
-export function ChatInterface({ agent }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const { toast } = useToast()
+export function ChatInterface({
+  agentId,
+  agentName,
+  agentIconUrl,
+  messages,
+  onSendMessage,
+  isLoading = false,
+  placeholder = "Digite sua mensagem...",
+}: ChatInterfaceProps) {
+  const [inputValue, setInputValue] = useState("")
+  const [attachments, setAttachments] = useState<File[]>([])
+  const [isSending, setIsSending] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Carregar mensagens iniciais ou exibir mensagem de boas-vindas
+  // Scroll to bottom when messages change
   useEffect(() => {
-    // Mensagem de boas-vindas do agente
-    const welcomeMessage: Message = {
-      id: "welcome",
-      content: agent.welcomeMessage || `Olá! Eu sou ${agent.name}. Como posso ajudar?`,
-      role: "assistant",
-      createdAt: new Date(),
-    }
-    setMessages([welcomeMessage])
-  }, [agent])
-
-  // Rolar para o final quando novas mensagens são adicionadas
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return
-
-    const userMessage: Message = {
-      id: `user_${Date.now()}`,
-      content: input,
-      role: "user",
-      createdAt: new Date(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsLoading(true)
+    if (inputValue.trim() === "" && attachments.length === 0) return
+    if (isSending) return
 
     try {
-      // Enviar mensagem para o agente e obter resposta
-      const response = await conversationService.queryAgent(agent.id, input)
-
-      const assistantMessage: Message = {
-        id: `assistant_${Date.now()}`,
-        content: response.text,
-        role: "assistant",
-        createdAt: new Date(),
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
+      setIsSending(true)
+      await onSendMessage(inputValue, attachments.length > 0 ? attachments : undefined)
+      setInputValue("")
+      setAttachments([])
     } catch (error) {
-      console.error("Erro ao enviar mensagem:", error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível enviar sua mensagem. Tente novamente.",
-        variant: "destructive",
-      })
+      console.error("Error sending message:", error)
     } finally {
-      setIsLoading(false)
+      setIsSending(false)
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
     }
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachments(Array.from(e.target.files))
+    }
+  }
+
+  const handleAttachmentClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const renderMessageContent = (content: string) => {
+    // Simple markdown-like rendering
+    return content.split("\n").map((line, i) => <p key={i}>{line}</p>)
+  }
+
   return (
-    <Card className="flex flex-col h-[calc(100vh-12rem)]">
-      <CardHeader className="px-4 py-3 border-b">
-        <CardTitle className="flex items-center text-lg">
+    <Card className="flex flex-col h-full">
+      <CardHeader className="border-b">
+        <CardTitle className="flex items-center">
           <Avatar className="h-8 w-8 mr-2">
-            <AvatarImage src={agent.iconUrl || ""} alt={agent.name} />
-            <AvatarFallback>
-              <Bot className="h-5 w-5" />
-            </AvatarFallback>
+            <AvatarImage src={agentIconUrl || "/placeholder.svg"} alt={agentName} />
+            <AvatarFallback>{agentName.charAt(0)}</AvatarFallback>
           </Avatar>
-          {agent.name}
+          {agentName}
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`flex max-w-[80%] ${
-                    message.role === "user" ? "flex-row-reverse items-end" : "flex-row items-end"
-                  }`}
-                >
-                  <Avatar className={`h-8 w-8 ${message.role === "user" ? "ml-2" : "mr-2"}`}>
-                    {message.role === "user" ? (
-                      <>
-                        <AvatarImage src="/placeholder.svg" alt="User" />
-                        <AvatarFallback>
-                          <User className="h-5 w-5" />
-                        </AvatarFallback>
-                      </>
-                    ) : (
-                      <>
-                        <AvatarImage src={agent.iconUrl || ""} alt={agent.name} />
-                        <AvatarFallback>
-                          <Bot className="h-5 w-5" />
-                        </AvatarFallback>
-                      </>
-                    )}
-                  </Avatar>
-                  <div
-                    className={`rounded-lg px-4 py-2 ${
-                      message.role === "user" ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-800"
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {message.createdAt.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                  </div>
-                </div>
+      <CardContent className="flex-1 overflow-hidden p-0">
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto p-4">
+            {messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                Inicie uma conversa com {agentName}
               </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="flex items-end">
-                  <Avatar className="h-8 w-8 mr-2">
-                    <AvatarImage src={agent.iconUrl || ""} alt={agent.name} />
-                    <AvatarFallback>
-                      <Bot className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="rounded-lg px-4 py-2 bg-gray-100 dark:bg-gray-800">
-                    <div className="flex space-x-1">
-                      <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                      <div className="h-2 w-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={cn("flex", {
+                      "justify-end": message.role === "user",
+                      "justify-start": message.role !== "user",
+                    })}
+                  >
+                    <div
+                      className={cn("max-w-[80%] rounded-lg p-3", {
+                        "bg-primary text-primary-foreground": message.role === "user",
+                        "bg-muted": message.role !== "user",
+                      })}
+                    >
+                      {renderMessageContent(message.content)}
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {message.attachments.map((attachment, index) => (
+                            <div key={index} className="text-xs flex items-center">
+                              <Paperclip className="h-3 w-3 mr-1" />
+                              <span>{attachment.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div
+                        className={cn("text-xs mt-1", {
+                          "text-primary-foreground/70": message.role === "user",
+                          "text-muted-foreground": message.role !== "user",
+                        })}
+                      >
+                        {new Date(message.createdAt).toLocaleTimeString()}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[80%] rounded-lg p-3 bg-muted">
+                      <div className="flex items-center">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span>{agentName} está digitando...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
             )}
           </div>
-        </ScrollArea>
-      </CardContent>
-      <CardFooter className="p-4 border-t">
-        <div className="flex w-full items-center space-x-2">
-          <Button variant="ghost" size="icon">
-            <Paperclip className="h-5 w-5" />
-          </Button>
-          <Input
-            placeholder="Digite sua mensagem..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            className="flex-1"
-          />
-          <Button variant="ghost" size="icon">
-            <Mic className="h-5 w-5" />
-          </Button>
-          <Button onClick={handleSendMessage} disabled={isLoading || !input.trim()}>
-            <Send className="h-5 w-5" />
-          </Button>
+          <div className="border-t p-4">
+            {attachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {attachments.map((file, index) => (
+                  <div key={index} className="bg-muted rounded px-2 py-1 text-xs flex items-center">
+                    <Paperclip className="h-3 w-3 mr-1" />
+                    <span className="truncate max-w-[150px]">{file.name}</span>
+                    <button
+                      className="ml-1 text-gray-500 hover:text-gray-700"
+                      onClick={() => setAttachments(attachments.filter((_, i) => i !== index))}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <Textarea
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                className="min-h-[60px] flex-1"
+                disabled={isSending}
+              />
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={handleAttachmentClick}
+                  disabled={isSending}
+                >
+                  <Paperclip className="h-4 w-4" />
+                  <span className="sr-only">Anexar arquivo</span>
+                </Button>
+                <Button type="button" size="icon" onClick={handleSendMessage} disabled={isSending}>
+                  {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <span className="sr-only">Enviar mensagem</span>
+                </Button>
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt"
+              />
+            </div>
+          </div>
         </div>
-      </CardFooter>
+      </CardContent>
     </Card>
   )
 }

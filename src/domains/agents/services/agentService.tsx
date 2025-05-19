@@ -1,8 +1,14 @@
 import { supabaseClient } from "@/lib/supabase"
-import type { Agent, CreateAgentParams, UpdateAgentParams } from "../types/agent.types"
+import type {
+  Agent,
+  CreateAgentParams,
+  UpdateAgentParams,
+  AgentQueryParams,
+  AgentQueryResponse,
+} from "../types/agent.types"
 
 /**
- * Serviço para gerenciar agentes
+ * Serviço responsável por gerenciar operações relacionadas a agentes
  */
 export const agentService = {
   /**
@@ -52,9 +58,11 @@ export const agentService = {
           instructions: params.instructions,
           model_name: params.modelName,
           temperature: params.temperature,
-          max_tokens: params.maxTokens,
           visibility: params.visibility,
-          is_active: params.isActive,
+          icon_url: params.iconUrl,
+          handle: params.handle,
+          include_sources: params.includeSources,
+          interface_config: params.interfaceConfig,
         },
       ])
       .select()
@@ -70,20 +78,21 @@ export const agentService = {
   /**
    * Atualiza um agente existente
    */
-  async updateAgent(id: string, params: UpdateAgentParams): Promise<Agent> {
+  async updateAgent(params: UpdateAgentParams): Promise<Agent> {
     const updateData: Record<string, any> = {}
 
-    if (params.name !== undefined) updateData.name = params.name
-    if (params.description !== undefined) updateData.description = params.description
-    if (params.instructions !== undefined) updateData.instructions = params.instructions
-    if (params.modelName !== undefined) updateData.model_name = params.modelName
+    if (params.name) updateData.name = params.name
+    if (params.description) updateData.description = params.description
+    if (params.instructions) updateData.instructions = params.instructions
+    if (params.modelName) updateData.model_name = params.modelName
     if (params.temperature !== undefined) updateData.temperature = params.temperature
-    if (params.maxTokens !== undefined) updateData.max_tokens = params.maxTokens
-    if (params.visibility !== undefined) updateData.visibility = params.visibility
-    if (params.isActive !== undefined) updateData.is_active = params.isActive
+    if (params.visibility) updateData.visibility = params.visibility
     if (params.iconUrl !== undefined) updateData.icon_url = params.iconUrl
+    if (params.handle !== undefined) updateData.handle = params.handle
+    if (params.includeSources !== undefined) updateData.include_sources = params.includeSources
+    if (params.interfaceConfig) updateData.interface_config = params.interfaceConfig
 
-    const { data, error } = await supabaseClient.from("agents").update(updateData).eq("id", id).select().single()
+    const { data, error } = await supabaseClient.from("agents").update(updateData).eq("id", params.id).select().single()
 
     if (error) {
       throw new Error(`Failed to update agent: ${error.message}`)
@@ -102,6 +111,27 @@ export const agentService = {
       throw new Error(`Failed to delete agent: ${error.message}`)
     }
   },
+
+  /**
+   * Consulta um agente com uma mensagem
+   */
+  async queryAgent(params: AgentQueryParams): Promise<AgentQueryResponse> {
+    // Implementação da consulta ao agente via API
+    const response = await fetch("/api/agents/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`Failed to query agent: ${error.message}`)
+    }
+
+    return response.json()
+  },
 }
 
 // Helper function to transform database record to Agent type
@@ -110,16 +140,19 @@ function transformAgentFromDB(record: any): Agent {
     id: record.id,
     organizationId: record.organization_id,
     name: record.name,
-    description: record.description || "",
-    instructions: record.instructions || "",
+    description: record.description,
+    instructions: record.instructions,
     modelName: record.model_name,
     temperature: record.temperature,
-    maxTokens: record.max_tokens,
+    iconUrl: record.icon_url,
+    handle: record.handle,
     visibility: record.visibility,
-    isActive: record.is_active,
-    iconUrl: record.icon_url || null,
-    welcomeMessage: record.welcome_message || null,
+    interfaceConfig: record.interface_config,
+    includeSources: record.include_sources,
+    tools: record.tools || [],
     createdAt: new Date(record.created_at),
     updatedAt: new Date(record.updated_at),
   }
 }
+
+// Re-export from agentService.ts from "./agentService"

@@ -1,5 +1,10 @@
 import { supabaseClient } from "@/lib/supabase"
-import type { Integration, CreateIntegrationParams, UpdateIntegrationParams } from "../types/integration.types"
+import type {
+  Integration,
+  CreateIntegrationParams,
+  UpdateIntegrationParams,
+  IntegrationStatus,
+} from "../types/integration.types"
 
 /**
  * Serviço para gerenciar integrações
@@ -49,8 +54,8 @@ export const integrationService = {
           organization_id: organizationId,
           name: params.name,
           type: params.type,
-          status: "pending",
           config: params.config,
+          status: "pending" as IntegrationStatus,
         },
       ])
       .select()
@@ -59,6 +64,11 @@ export const integrationService = {
     if (error) {
       throw new Error(`Failed to create integration: ${error.message}`)
     }
+
+    // Iniciar processo de ativação da integração (simulado)
+    setTimeout(() => {
+      this.updateIntegrationStatus(data.id, "active")
+    }, 2000)
 
     return transformIntegrationFromDB(data)
   },
@@ -70,8 +80,8 @@ export const integrationService = {
     const updateData: Record<string, any> = {}
 
     if (params.name) updateData.name = params.name
-    if (params.status) updateData.status = params.status
     if (params.config) updateData.config = params.config
+    if (params.status) updateData.status = params.status
 
     const { data, error } = await supabaseClient
       .from("integrations")
@@ -88,6 +98,17 @@ export const integrationService = {
   },
 
   /**
+   * Atualiza o status de uma integração
+   */
+  async updateIntegrationStatus(id: string, status: IntegrationStatus): Promise<void> {
+    const { error } = await supabaseClient.from("integrations").update({ status }).eq("id", id)
+
+    if (error) {
+      console.error(`Failed to update integration status: ${error.message}`)
+    }
+  },
+
+  /**
    * Remove uma integração
    */
   async deleteIntegration(id: string): Promise<void> {
@@ -96,6 +117,21 @@ export const integrationService = {
     if (error) {
       throw new Error(`Failed to delete integration: ${error.message}`)
     }
+  },
+
+  /**
+   * Testa uma integração
+   */
+  async testIntegration(id: string): Promise<{ success: boolean; message: string }> {
+    // Simulação de teste de integração
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          success: true,
+          message: "Integração testada com sucesso",
+        })
+      }, 1500)
+    })
   },
 }
 
@@ -106,8 +142,8 @@ function transformIntegrationFromDB(record: any): Integration {
     organizationId: record.organization_id,
     name: record.name,
     type: record.type,
-    status: record.status,
     config: record.config,
+    status: record.status,
     createdAt: new Date(record.created_at),
     updatedAt: new Date(record.updated_at),
   }

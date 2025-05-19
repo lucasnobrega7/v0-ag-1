@@ -1,7 +1,7 @@
-import { clerkMiddleware } from "@clerk/nextjs/server"
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 
 // Define as rotas públicas que não precisam de autenticação
-const publicRoutes = [
+const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
@@ -10,17 +10,20 @@ const publicRoutes = [
   "/api/webhooks/clerk",
   "/api/public/(.*)",
   "/docs/(.*)",
-]
+])
 
 // Define as rotas que devem ser ignoradas completamente
 const ignoredRoutes = ["/_next/(.*)", "/favicon.ico", "/static/(.*)"]
 
-export default clerkMiddleware({
-  publicRoutes,
-  ignoredRoutes,
-})
+export default clerkMiddleware(
+  (auth, request) => {
+    if (!isPublicRoute(request)) {
+      auth().protect()
+    }
+  },
+  { ignoredRoutes },
+)
 
-// Configuração do matcher usando a sintaxe correta do Next.js
 export const config = {
   matcher: [
     // Rotas que devem passar pelo middleware

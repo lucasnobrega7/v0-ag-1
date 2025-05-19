@@ -1,5 +1,11 @@
 import { supabaseClient } from "@/lib/supabase"
-import type { Conversation, Message, QueryResponse } from "../types/conversation.types"
+import type {
+  Conversation,
+  Message,
+  CreateConversationParams,
+  SendMessageParams,
+  ConversationWithMessages,
+} from "../types/conversation.types"
 
 /**
  * Serviço para gerenciar conversas e mensagens
@@ -25,30 +31,49 @@ export const conversationService = {
   /**
    * Obtém uma conversa pelo ID
    */
-  async getConversationById(id: string): Promise<Conversation | null> {
-    const { data, error } = await supabaseClient.from("conversations").select("*").eq("id", id).single()
+  async getConversationById(id: string): Promise<ConversationWithMessages | null> {
+    // Obter a conversa
+    const { data: conversation, error: conversationError } = await supabaseClient
+      .from("conversations")
+      .select("*")
+      .eq("id", id)
+      .single()
 
-    if (error) {
-      if (error.code === "PGRST116") {
+    if (conversationError) {
+      if (conversationError.code === "PGRST116") {
         return null
       }
-      throw new Error(`Failed to fetch conversation: ${error.message}`)
+      throw new Error(`Failed to fetch conversation: ${conversationError.message}`)
     }
 
-    return transformConversationFromDB(data)
+    // Obter as mensagens da conversa
+    const { data: messages, error: messagesError } = await supabaseClient
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true })
+
+    if (messagesError) {
+      throw new Error(`Failed to fetch messages: ${messagesError.message}`)
+    }
+
+    return {
+      ...transformConversationFromDB(conversation),
+      messages: messages.map(transformMessageFromDB),
+    }
   },
 
   /**
    * Cria uma nova conversa
    */
-  async createConversation(userId: string, agentId: string, title?: string): Promise<Conversation> {
+  async createConversation(params: CreateConversationParams): Promise<Conversation> {
     const { data, error } = await supabaseClient
       .from("conversations")
       .insert([
         {
-          user_id: userId,
-          agent_id: agentId,
-          title: title || "Nova conversa",
+          user_id: params.userId,
+          agent_id: params.agentId,
+          title: params.title || "Nova conversa",
         },
       ])
       .select()
@@ -62,64 +87,72 @@ export const conversationService = {
   },
 
   /**
-   * Obtém mensagens de uma conversa
+   * Envia uma mensagem em uma conversa
    */
-  async getMessages(conversationId: string): Promise<Message[]> {
-    const { data, error } = await supabaseClient
-      .from("messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true })
-
-    if (error) {
-      throw new Error(`Failed to fetch messages: ${error.message}`)
-    }
-
-    return data.map(transformMessageFromDB)
-  },
-
-  /**
-   * Adiciona uma mensagem a uma conversa
-   */
-  async addMessage(conversationId: string, content: string, role: "user" | "assistant"): Promise<Message> {
-    const { data, error } = await supabaseClient
+  async sendMessage(params: SendMessageParams): Promise<Message> {
+    // Inserir a mensagem
+    const { data: message, error: messageError } = await supabaseClient
       .from("messages")
       .insert([
         {
-          conversation_id: conversationId,
-          content,
-          role,
+          conversation_id: params.conversationId,
+          role: params.role,
+          content: params.content,
+          attachments: params.attachments,
         },
       ])
       .select()
       .single()
 
-    if (error) {
-      throw new Error(`Failed to add message: ${error.message}`)
+    if (messageError) {
+      throw new Error(`Failed to send message: ${messageError.message}`)
     }
 
     // Atualizar a data de atualização da conversa
-    await supabaseClient.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId)
+    const { error: updateError } = await supabaseClient
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", params.conversationId)
 
-    return transformMessageFromDB(data)
+    if (updateError) {
+      console.error("Failed to update conversation timestamp:", updateError)
+    }
+
+    return transformMessageFromDB(message)
   },
 
   /**
-   * Envia uma consulta para um agente e obtém a resposta
+   * Atualiza o título de uma conversa
    */
-  async queryAgent(agentId: string, query: string): Promise<QueryResponse> {
-    // Em um ambiente real, isso chamaria a API do agente
-    // Aqui, estamos simulando uma resposta
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+  async updateConversationTitle(id: string, title: string): Promise<void> {
+    const { error } = await supabaseClient.from("conversations").update({ title }).eq("id", id)
 
-    return {
-      text: `Resposta simulada para: "${query}"\n\nEsta é uma resposta de exemplo do agente. Em um ambiente de produção, isso seria processado pelo modelo de linguagem configurado para o agente.`,
-      sources: [],
+    if (error) {
+      throw new Error(`Failed to update conversation title: ${error.message}`)
+    }
+  },
+
+  /**
+   * Remove uma conversa
+   */
+  async deleteConversation(id: string): Promise<void> {
+    // Primeiro, remover todas as mensagens da conversa
+    const { error: messagesError } = await supabaseClient.from("messages").delete().eq("conversation_id", id)
+
+    if (messagesError) {
+      throw new Error(`Failed to delete conversation messages: ${messagesError.message}`)
+    }
+
+    // Em seguida, remover a conversa
+    const { error: conversationError } = await supabaseClient.from("conversations").delete().eq("id", id)
+
+    if (conversationError) {
+      throw new Error(`Failed to delete conversation: ${conversationError.message}`)
     }
   },
 }
 
-// Helper functions to transform database records
+// Helper function to transform database record to Conversation type
 function transformConversationFromDB(record: any): Conversation {
   return {
     id: record.id,
@@ -131,12 +164,14 @@ function transformConversationFromDB(record: any): Conversation {
   }
 }
 
+// Helper function to transform database record to Message type
 function transformMessageFromDB(record: any): Message {
   return {
     id: record.id,
     conversationId: record.conversation_id,
-    content: record.content,
     role: record.role,
+    content: record.content,
+    attachments: record.attachments || [],
     createdAt: new Date(record.created_at),
   }
 }

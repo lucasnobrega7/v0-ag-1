@@ -1,5 +1,5 @@
 import type React from "react"
-import { MultiDomainClerkProvider } from "@/lib/auth/clerk-multi-domain"
+import { ClerkProvider } from "@clerk/nextjs"
 import { ThemeProvider } from "@/components/providers/theme-provider"
 import { AnalyticsProvider } from "@/components/providers/analytics-provider"
 import { Suspense } from "react"
@@ -19,11 +19,11 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <body>
         <Suspense fallback={<div className="flex h-screen w-full items-center justify-center">Carregando...</div>}>
-          <MultiDomainClerkProvider>
+          <ClerkProvider>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
               <AnalyticsProvider>{children}</AnalyticsProvider>
             </ThemeProvider>
-          </MultiDomainClerkProvider>
+          </ClerkProvider>
         </Suspense>
       </body>
     </html>

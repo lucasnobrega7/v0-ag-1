@@ -1,58 +1,21 @@
 "use client"
 
-import type React from "react"
-
-import { useRef, useCallback, useEffect, useState } from "react"
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  Panel,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  type Connection,
-  type Node,
-  type Edge,
-} from "reactflow"
+import { useState, useCallback } from "react"
+import ReactFlow, { Background, Controls, MiniMap, Panel, addEdge, type Connection } from "reactflow"
 import "reactflow/dist/style.css"
-import { useFlow } from "@/contexts/FlowContext"
 import { Button } from "@/components/ui/button"
-import {
-  Save,
-  Plus,
-  Play,
-  Download,
-  Upload,
-  Undo2,
-  Redo2,
-  Check,
-  AlertTriangle,
-  FileText,
-  Settings,
-} from "lucide-react"
-import { NodePanel } from "./NodePanel"
-import { NodeEditor } from "./NodeEditor"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useFlow } from "@/contexts/FlowContext"
 import { IntentNode } from "./nodes/IntentNode"
 import { MessageNode } from "./nodes/MessageNode"
 import { ActionNode } from "./nodes/ActionNode"
 import { ConditionNode } from "./nodes/ConditionNode"
-import { useToast } from "@/components/ui/use-toast"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { FlowTemplates } from "./FlowTemplates"
-import { FlowSimulator } from "./FlowSimulator"
+import { NodeEditor } from "./NodeEditor"
+import { Save, Undo, Redo, Play, Plus } from "lucide-react"
 
-// Register custom node types
+// Definir os tipos de nós personalizados
 const nodeTypes = {
   intentNode: IntentNode,
   messageNode: MessageNode,
@@ -60,370 +23,203 @@ const nodeTypes = {
   conditionNode: ConditionNode,
 }
 
-export function FlowEditor() {
+interface FlowEditorProps {
+  flowId: string
+}
+
+export function FlowEditor({ flowId }: FlowEditorProps) {
   const {
     flow,
     nodes,
     edges,
     setNodes,
     setEdges,
+    loadFlow,
     saveFlow,
-    saving,
-    addNode,
-    updateNode,
-    removeNode,
-    addEdge: addFlowEdge,
-    removeEdge,
     updateFlowName,
     updateFlowDescription,
-    validateFlow,
     undo,
     redo,
     canUndo,
     canRedo,
+    loading,
+    saving,
   } = useFlow()
 
-  const [reactflowNodes, setReactflowNodes, onNodesChange] = useNodesState([])
-  const [reactflowEdges, setReactflowEdges, onEdgesChange] = useEdgesState([])
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null)
-  const [showNodePanel, setShowNodePanel] = useState(false)
-  const [showNodeEditor, setShowNodeEditor] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
-  const [showSimulator, setShowSimulator] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [showValidation, setShowValidation] = useState(false)
-  const [validationResults, setValidationResults] = useState<{ valid: boolean; errors: string[] }>({
-    valid: true,
-    errors: [],
+  const [selectedNode, setSelectedNode] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string>("editor")
+
+  // Carregar o fluxo quando o componente for montado
+  useState(() => {
+    loadFlow(flowId)
   })
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast()
 
-  // Sync nodes and edges with context
-  useEffect(() => {
-    setReactflowNodes(nodes)
-  }, [nodes])
+  // Manipuladores de eventos do ReactFlow
+  const onNodesChange = useCallback(
+    (changes) => {
+      setNodes(changes)
+    },
+    [setNodes],
+  )
 
-  useEffect(() => {
-    setReactflowEdges(edges)
-  }, [edges])
-
-  // Update context when nodes or edges change
-  useEffect(() => {
-    setNodes(reactflowNodes)
-  }, [reactflowNodes, setNodes])
-
-  useEffect(() => {
-    setEdges(reactflowEdges)
-  }, [reactflowEdges, setEdges])
+  const onEdgesChange = useCallback(
+    (changes) => {
+      setEdges(changes)
+    },
+    [setEdges],
+  )
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const newEdge = {
-        ...connection,
-        id: `edge_${Date.now()}`,
-        animated: true,
-        style: { stroke: "#FF5722", strokeWidth: 2 },
-      } as Edge
-      setReactflowEdges((eds) => addEdge(newEdge, eds))
-      addFlowEdge(newEdge)
+      setEdges((eds) => addEdge({ ...connection, animated: true }, eds))
     },
-    [setReactflowEdges, addFlowEdge],
+    [setEdges],
   )
 
-  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    setSelectedNode(node)
-    setShowNodeEditor(true)
-  }, [])
+  const onNodeClick = useCallback(
+    (_, node) => {
+      setSelectedNode(node.id)
+    },
+    [setSelectedNode],
+  )
 
-  const handleSave = async () => {
-    // Validar o fluxo antes de salvar
-    const validation = validateFlow()
-    if (!validation.valid) {
-      setValidationResults(validation)
-      setShowValidation(true)
-      return
-    }
-
-    await saveFlow()
-  }
-
-  const handleAddNode = (nodeType: string, data: any) => {
-    const newNode = {
-      id: `${nodeType}_${Date.now()}`,
-      type: nodeType,
-      position: { x: 100, y: 100 },
-      data,
-    }
-    addNode(newNode)
-    setShowNodePanel(false)
-  }
-
-  const handleUpdateNode = (nodeId: string, data: any) => {
-    updateNode(nodeId, data)
-    setShowNodeEditor(false)
+  const onPaneClick = useCallback(() => {
     setSelectedNode(null)
-  }
+  }, [setSelectedNode])
 
-  const handleDeleteNode = (nodeId: string) => {
-    removeNode(nodeId)
-    setShowNodeEditor(false)
-    setSelectedNode(null)
-  }
-
-  // Export flow as JSON
-  const handleExport = () => {
-    if (!flow) return
-
-    const flowData = {
-      id: flow.id,
-      name: flow.name,
-      description: flow.description,
-      nodes,
-      edges,
-    }
-
-    const dataStr = JSON.stringify(flowData, null, 2)
-    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr)
-
-    const exportFileDefaultName = `flow-${flow.id}-${Date.now()}.json`
-
-    const linkElement = document.createElement("a")
-    linkElement.setAttribute("href", dataUri)
-    linkElement.setAttribute("download", exportFileDefaultName)
-    linkElement.click()
-  }
-
-  // Import flow from JSON
-  const handleImport = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const result = e.target?.result
-        if (typeof result === "string") {
-          const flowData = JSON.parse(result)
-
-          if (flowData.nodes && flowData.edges) {
-            setNodes(flowData.nodes)
-            setEdges(flowData.edges)
-
-            // Atualizar nome e descrição se disponíveis
-            if (flowData.name) updateFlowName(flowData.name)
-            if (flowData.description) updateFlowDescription(flowData.description)
-
-            toast({
-              title: "Fluxo importado com sucesso",
-              description: "O fluxo foi importado com sucesso.",
-            })
-          } else {
-            throw new Error("Invalid flow data format")
-          }
-        }
-      } catch (error) {
-        console.error("Error importing flow:", error)
-        toast({
-          title: "Erro ao importar",
-          description: "O arquivo selecionado não é um fluxo válido.",
-          variant: "destructive",
-        })
+  // Adicionar um novo nó ao fluxo
+  const addNode = useCallback(
+    (type: string) => {
+      const newNode = {
+        id: `${type}_${Date.now()}`,
+        type: `${type}Node`,
+        position: { x: 100, y: 100 },
+        data: {
+          label: `Novo ${type}`,
+          // Dados específicos para cada tipo de nó
+          ...(type === "intent" && { patterns: [] }),
+          ...(type === "message" && { content: "" }),
+          ...(type === "action" && { actionType: "api", config: {} }),
+          ...(type === "condition" && { condition: "", branches: [{ label: "Sim" }, { label: "Não" }] }),
+        },
       }
-    }
-    reader.readAsText(file)
 
-    // Reset the file input
-    event.target.value = ""
-  }
+      setNodes([...nodes, newNode])
+    },
+    [nodes, setNodes],
+  )
 
+  // Renderizar o editor de fluxo
   return (
-    <>
-      <div className="h-[calc(100vh-4rem)] w-full">
-        <ReactFlow
-          nodes={reactflowNodes}
-          edges={reactflowEdges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          fitView
-        >
-          <Background />
-          <Controls />
-          <MiniMap
-            nodeStrokeColor={(n) => {
-              if (n.type === "intentNode") return "#0EA5E9"
-              if (n.type === "messageNode") return "#10B981"
-              if (n.type === "actionNode") return "#8B5CF6"
-              if (n.type === "conditionNode") return "#F59E0B"
-              return "#71717A"
-            }}
-            nodeColor={(n) => {
-              if (n.type === "intentNode") return "#0EA5E9"
-              if (n.type === "messageNode") return "#10B981"
-              if (n.type === "actionNode") return "#8B5CF6"
-              if (n.type === "conditionNode") return "#F59E0B"
-              return "#71717A"
-            }}
-          />
-          <Panel position="top-right" className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowNodePanel(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Adicionar Nó
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowTemplates(true)}>
-              <FileText className="mr-2 h-4 w-4" /> Templates
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowSettings(true)}>
-              <Settings className="mr-2 h-4 w-4" /> Configurações
-            </Button>
-            <Button variant="default" size="sm" onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" /> {saving ? "Salvando..." : "Salvar Fluxo"}
-            </Button>
-          </Panel>
-
-          <Panel position="bottom-right" className="flex gap-2">
+    <div className="h-full flex flex-col">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <div className="flex items-center justify-between border-b p-2">
+          <div className="flex items-center space-x-2">
+            <Input
+              value={flow?.name || ""}
+              onChange={(e) => updateFlowName(e.target.value)}
+              placeholder="Nome do fluxo"
+              className="w-64"
+            />
+            <TabsList>
+              <TabsTrigger value="editor">Editor</TabsTrigger>
+              <TabsTrigger value="simulator">Simulador</TabsTrigger>
+              <TabsTrigger value="code">Código</TabsTrigger>
+            </TabsList>
+          </div>
+          <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm" onClick={undo} disabled={!canUndo}>
-              <Undo2 className="h-4 w-4" />
+              <Undo className="h-4 w-4 mr-1" />
+              Desfazer
             </Button>
             <Button variant="outline" size="sm" onClick={redo} disabled={!canRedo}>
-              <Redo2 className="h-4 w-4" />
+              <Redo className="h-4 w-4 mr-1" />
+              Refazer
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowSimulator(true)}>
-              <Play className="mr-2 h-4 w-4" /> Simular
+            <Button variant="outline" size="sm" onClick={() => setActiveTab("simulator")}>
+              <Play className="h-4 w-4 mr-1" />
+              Testar
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" /> Exportar
+            <Button size="sm" onClick={saveFlow} disabled={saving}>
+              <Save className="h-4 w-4 mr-1" />
+              {saving ? "Salvando..." : "Salvar"}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleImport}>
-              <Upload className="mr-2 h-4 w-4" /> Importar
-            </Button>
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".json" className="hidden" />
-          </Panel>
-        </ReactFlow>
-
-        {showNodePanel && <NodePanel onClose={() => setShowNodePanel(false)} onAddNode={handleAddNode} />}
-
-        {showNodeEditor && selectedNode && (
-          <NodeEditor
-            node={selectedNode}
-            onClose={() => {
-              setShowNodeEditor(false)
-              setSelectedNode(null)
-            }}
-            onUpdate={handleUpdateNode}
-            onDelete={handleDeleteNode}
-          />
-        )}
-      </div>
-
-      {/* Diálogo de configurações do fluxo */}
-      <Dialog open={showSettings} onOpenChange={setShowSettings}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Configurações do Fluxo</DialogTitle>
-            <DialogDescription>Edite as configurações básicas do seu fluxo.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Nome
-              </Label>
-              <Input
-                id="name"
-                value={flow?.name || ""}
-                onChange={(e) => updateFlowName(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="description" className="text-right">
-                Descrição
-              </Label>
-              <Textarea
-                id="description"
-                value={flow?.description || ""}
-                onChange={(e) => updateFlowDescription(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
           </div>
-          <DialogFooter>
-            <Button type="submit" onClick={() => setShowSettings(false)}>
-              Salvar alterações
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
 
-      {/* Diálogo de validação do fluxo */}
-      <Dialog open={showValidation} onOpenChange={setShowValidation}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              {validationResults.valid ? (
-                <Check className="mr-2 h-5 w-5 text-green-500" />
-              ) : (
-                <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />
-              )}
-              Validação do Fluxo
-            </DialogTitle>
-            <DialogDescription>
-              {validationResults.valid
-                ? "Seu fluxo está válido e pronto para ser salvo."
-                : "Foram encontrados problemas no seu fluxo que precisam ser corrigidos."}
-            </DialogDescription>
-          </DialogHeader>
-          {!validationResults.valid && (
-            <div className="py-4">
-              <h4 className="mb-2 font-medium">Problemas encontrados:</h4>
-              <ul className="list-disc pl-5 space-y-1">
-                {validationResults.errors.map((error, index) => (
-                  <li key={index} className="text-sm text-amber-600 dark:text-amber-400">
-                    {error}
-                  </li>
-                ))}
-              </ul>
+        <TabsContent value="editor" className="flex-1 flex">
+          <div className="flex-1 relative">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              onPaneClick={onPaneClick}
+              nodeTypes={nodeTypes}
+              fitView
+            >
+              <Background />
+              <Controls />
+              <MiniMap />
+              <Panel position="top-right" className="bg-white rounded-md shadow-md p-2">
+                <div className="flex flex-col space-y-1">
+                  <Button size="sm" variant="outline" onClick={() => addNode("intent")}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Intent
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addNode("message")}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Message
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addNode("action")}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Action
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addNode("condition")}>
+                    <Plus className="h-3 w-3 mr-1" />
+                    Condition
+                  </Button>
+                </div>
+              </Panel>
+            </ReactFlow>
+          </div>
+
+          {selectedNode && (
+            <div className="w-80 border-l">
+              <NodeEditor nodeId={selectedNode} onClose={() => setSelectedNode(null)} />
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowValidation(false)}>
-              Fechar
-            </Button>
-            {!validationResults.valid && (
-              <Button
-                variant="default"
-                onClick={() => {
-                  setShowValidation(false)
-                  saveFlow() // Salvar mesmo com erros
-                }}
-              >
-                Salvar mesmo assim
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </TabsContent>
 
-      {/* Componente de templates */}
-      {showTemplates && (
-        <FlowTemplates
-          onClose={() => setShowTemplates(false)}
-          onSelectTemplate={(template) => {
-            setNodes(template.nodes)
-            setEdges(template.edges)
-            setShowTemplates(false)
-          }}
-        />
-      )}
+        <TabsContent value="simulator" className="flex-1">
+          <div className="p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Simulador de Fluxo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>O simulador permite testar o fluxo em tempo real.</p>
+                {/* Implementação do simulador */}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-      {/* Componente de simulação */}
-      {showSimulator && <FlowSimulator flow={{ nodes, edges }} onClose={() => setShowSimulator(false)} />}
-    </>
+        <TabsContent value="code" className="flex-1">
+          <div className="p-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Código do Fluxo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="bg-gray-100 p-4 rounded overflow-auto">{JSON.stringify({ nodes, edges }, null, 2)}</pre>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
