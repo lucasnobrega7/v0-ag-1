@@ -1,7 +1,7 @@
 "use client"
 
-import AgentChatPage from "../src/agents/agent-chat-page"
+import { DashboardSidebar } from "../src/components/dashboard-sidebar"
 
 export default function SyntheticV0PageForDeployment() {
-  return <AgentChatPage />
+  return <DashboardSidebar />
 }
